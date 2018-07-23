@@ -1,174 +1,3 @@
-#!/usr/bin/env bash
-
-#INSTALLATION INSTRUCTIONS
-#------------------------- for Ubuntu 16.04-server
-
-#1/ Minimal Ubuntu install
-#-------------------------
-
-# Install a minimal Ubuntu 16.04-server system with the software:
-# - OpenSSH server
-sudo apt-get -y install openssh-server
-
-# Make sure your system is up2date:
-sudo apt-get update
-sudo apt-get -y upgrade
-
-# install postfix, there will be some questions.
-sudo apt-get -y install postfix
-# Postfix Configuration: Satellite system
-# change the relay server later with:
-#sudo postconf -e 'relayhost = example.com'
-#sudo postfix reload
-
-
-#2/ Install LAMP & dependencies
-#------------------------------
-#Once the system is installed you can perform the following steps:
-
-# Install the dependencies: (some might already be installed)
-sudo apt-get -y install curl gcc git gnupg-agent make python python3 openssl redis-server sudo vim zip
-
-# Install MariaDB (a MySQL fork/alternative)
-sudo apt-get -y install mariadb-client mariadb-server
-
-# Secure the MariaDB installation (especially by setting a strong root password)
-sudo mysql_secure_installation
-
-read -rsp $'Press any key to continue...\n' -n1 key
-# Install Apache2
-sudo apt-get -y install apache2 apache2-doc apache2-utils
-
-# Enable modules, settings, and default of SSL in Apache
-sudo a2dismod status
-sudo a2enmod ssl
-sudo a2enmod rewrite
-sudo a2enmod headers
-sudo a2dissite 000-default
-sudo a2ensite default-ssl
-
-# Install PHP and dependencies
-sudo apt-get -y install libapache2-mod-php php php-cli php-crypt-gpg php-dev php-json php-mysql php-opcache php-readline php-redis php-xml
-
-# Apply all changes
-sudo systemctl restart apache2
-read -rsp $'Press any key to continue...\n' -n1 key
-#3/ MISP code
-#------------
-# Download MISP using git in the /var/www/ directory.
-sudo mkdir /var/www/MISP
-sudo chown www-data:www-data /var/www/MISP
-cd /var/www/MISP
-sudo -u www-data git clone https://github.com/MISP/MISP.git /var/www/MISP
-sudo -u www-data git checkout tags/$(git describe --tags `git rev-list --tags --max-count=1`)
-# if the last shortcut doesn't work, specify the latest version manually
-# example: git checkout tags/v2.4.XY
-# the message regarding a "detached HEAD state" is expected behaviour
-# (you only have to create a new branch, if you want to change stuff and do a pull request for example)
-
-# Make git ignore filesystem permission differences
-sudo -u www-data git config core.filemode false
-
-# install Mitre's STIX and its dependencies by running the following commands:
-sudo apt-get -y install python3-dev python3-pip libxml2-dev libxslt1-dev zlib1g-dev python-setuptools
-cd /var/www/MISP/app/files/scripts
-sudo -u www-data git clone https://github.com/CybOXProject/python-cybox.git
-sudo -u www-data git clone https://github.com/STIXProject/python-stix.git
-cd /var/www/MISP/app/files/scripts/python-cybox
-sudo python3 setup.py install
-cd /var/www/MISP/app/files/scripts/python-stix
-sudo python3 setup.py install
-
-# install mixbox to accomodate the new STIX dependencies:
-cd /var/www/MISP/app/files/scripts/
-sudo -u www-data git clone https://github.com/CybOXProject/mixbox.git
-cd /var/www/MISP/app/files/scripts/mixbox
-sudo python3 setup.py install
-
-# install PyMISP
-cd /var/www/MISP/PyMISP
-sudo python3 setup.py install
-
-# install support for STIX 2.0
-sudo pip3 install stix2
-
-#4/ CakePHP
-#-----------
-# CakePHP is included as a submodule of MISP, execute the following commands to let git fetch it:
-cd /var/www/MISP
-sudo -u www-data git submodule init
-sudo -u www-data git submodule update
-# Make git ignore filesystem permission differences for submodules
-sudo -u www-data git submodule foreach git config core.filemode false
-
-# Once done, install CakeResque along with its dependencies if you intend to use the built in background jobs:
-cd /var/www/MISP/app
-sudo -u www-data php composer.phar require kamisama/cake-resque:4.1.2
-sudo -u www-data php composer.phar config vendor-dir Vendor
-sudo -u www-data php composer.phar install
-
-# Enable CakeResque with php-redis
-sudo phpenmod redis
-
-# To use the scheduler worker for scheduled tasks, do the following:
-sudo -u www-data cp -fa /var/www/MISP/INSTALL/setup/config.php /var/www/MISP/app/Plugin/CakeResque/Config/config.php
-
-# If you have multiple MISP instances on the same system, don't forget to have a different Redis per MISP instance for the CakeResque workers
-# The default Redis port can be updated in Plugin/CakeResque/Config/config.php
-
-#5/ Set the permissions
-#----------------------
-
-# Check if the permissions are set correctly using the following commands:
-sudo chown -R www-data:www-data /var/www/MISP
-sudo chmod -R 750 /var/www/MISP
-sudo chmod -R g+ws /var/www/MISP/app/tmp
-sudo chmod -R g+ws /var/www/MISP/app/files
-sudo chmod -R g+ws /var/www/MISP/app/files/scripts/tmp
-
-
-#6/ Create a database and user
-#-----------------------------
-# Enter the mysql shell
-sudo mysql -u root -p
-
-#MariaDB [(none)]> create database misp;
-#MariaDB [(none)]> grant usage on *.* to misp@localhost identified by 'XXXXdbpasswordhereXXXXX';
-#MariaDB [(none)]> grant all privileges on misp.* to misp@localhost;
-#MariaDB [(none)]> flush privileges;
-#MariaDB [(none)]> exit
-
-# Import the empty MISP database from MYSQL.sql
-sudo -u www-data sh -c "mysql -u misp -p misp < /var/www/MISP/INSTALL/MYSQL.sql"
-# enter the password you've set in line 130 when prompted
-
-
-#7/ Apache configuration
-#-----------------------
-# Now configure your Apache webserver with the DocumentRoot /var/www/MISP/app/webroot/
-
-# If the apache version is 2.2:
-#sudo cp /var/www/MISP/INSTALL/apache.22.misp.ssl /etc/apache2/sites-available/misp-ssl.conf
-
-# If the apache version is 2.4:
-sudo cp /var/www/MISP/INSTALL/apache.24.misp.ssl /etc/apache2/sites-available/misp-ssl.conf
-
-# SEE MISP-INSTALL-SSL.TXT
-
-# activate new vhost
-sudo a2dissite default-ssl
-sudo a2ensite misp-ssl
-
-# Restart apache
-sudo systemctl restart apache2
-
-#8/ Log rotation
-#---------------
-# MISP saves the stdout and stderr of its workers in /var/www/MISP/app/tmp/logs
-# To rotate these logs install the supplied logrotate script:
-
-sudo cp /var/www/MISP/INSTALL/misp.logrotate /etc/logrotate.d/misp
-
 #9/ MISP configuration
 #---------------------
 # There are 4 sample configuration files in /var/www/MISP/app/Config that need to be copied
@@ -207,6 +36,7 @@ salt_str=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;)
 file=/var/www/MISP/app/Config/config.php
 sed -i "s/('salt'\s+=> )'',/$1'$salt_str',/" "$file"
 #################################
+read -rsp $'Press any key to continue...\n' -n1 key
 
 # The admin user account will be generated on the first login, make sure that the salt is changed before you create that user
 # If you forget to do this step, and you are still dealing with a fresh installation, just alter the salt,
@@ -217,6 +47,7 @@ echo Input new admin account password:
 read pass
 /var/www/MISP/app/Console/cake Password admin@admin.test $pass
 #################################
+read -rsp $'Press any key to continue...\n' -n1 key
 
 #### THIS NEEDS TO BE TESTED ####
 # Change baseurl
@@ -224,6 +55,7 @@ echo Input BaseURL:
 read base_url
 /var/www/MISP/app/Console/cake Baseurl $base_url
 #################################
+read -rsp $'Press any key to continue...\n' -n1 key
 # alternatively, you can leave this field empty if you would like to use relative pathing in MISP.
 # This however is highly advised against.
 
@@ -290,6 +122,7 @@ sudo chown -R www-data:www-data /var/www/MISP/<directory path with an indicated 
 #- Keep your software up2date (OS, MISP, CakePHP and everything else)
 #- Log and audit
 
+read -rsp $'Press any key to continue...\n' -n1 key
 
 #Optional features
 #-----------------
