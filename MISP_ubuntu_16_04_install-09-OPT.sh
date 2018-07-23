@@ -9,7 +9,7 @@ sudo -u www-data cp -a /var/www/MISP/app/Config/config.default.php /var/www/MISP
 # Configure the fields in the newly created files:
 echo Input sqlDB password:
 read pass
-sed -i "s/('password' => )'XXXXdbpasswordhereXXXXX',/$1'$pass'" "/var/www/MISP/app/Config/database.php"
+sudo sed -i "s/('password' => )'XXXXdbpasswordhereXXXXX',/$1'$pass'/" "/var/www/MISP/app/Config/database.php"
 
 #sudo -u www-data vim /var/www/MISP/app/Config/database.php
 # DATABASE_CONFIG has to be filled

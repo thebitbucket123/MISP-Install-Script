@@ -1,9 +1,5 @@
 #6/ Create a database and user
 #-----------------------------
-
-echo Input mysql root account password:
-read pass
-
 # Enter the mysql shell
 sudo mysql -u root -p
 
