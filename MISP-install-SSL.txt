@@ -1,0 +1,49 @@
+# Be aware that the configuration files for apache 2.4 and up have changed.
+# The configuration file has to have the .conf extension in the sites-available directory
+# For more information, visit http://httpd.apache.org/docs/2.4/upgrading.html
+
+# If a valid SSL certificate is not already created for the server, create a self-signed certificate:
+#sudo openssl req -newkey rsa:4096 -days 365 -nodes -x509 \
+#-subj "/C=<Country>/ST=<State>/L=<Locality>/O=<Organization>/OU=<Organizational Unit Name>/CN=<QDN.here>/emailAddress=admin@<your.FQDN.here>" \
+#-keyout /etc/ssl/private/misp.local.key -out /etc/ssl/private/misp.local.crt
+
+# Please find a sample conf file for an SSL enabled conf file in-line below (alternatively use one of the samples provided in /var/www/MISP/INSTALL
+
+# Also remember to verify the SSLCertificateChainFile property in your config file - this is usually commented out for the self-generated certificate in the sample configurations, such as the one pasted below.
+
+# Otherwise, copy the SSLCertificateFile, SSLCertificateKeyFile, and SSLCertificateChainFile to /etc/ssl/private/. (Modify path and config to fit your environment)
+
+============================================= Begin sample working SSL config for MISP
+<VirtualHost <IP, FQDN, or *>:80>
+        ServerName <your.FQDN.here>
+
+        Redirect permanent / https://<your.FQDN.here>
+
+        LogLevel warn
+        ErrorLog /var/log/apache2/misp.local_error.log
+        CustomLog /var/log/apache2/misp.local_access.log combined
+        ServerSignature Off
+</VirtualHost>
+
+<VirtualHost <IP, FQDN, or *>:443>
+        ServerAdmin admin@<your.FQDN.here>
+        ServerName <your.FQDN.here>
+        DocumentRoot /var/www/MISP/app/webroot
+        <Directory /var/www/MISP/app/webroot>
+                Options -Indexes
+                AllowOverride all
+                Order allow,deny
+                allow from all
+        </Directory>
+
+        SSLEngine On
+        SSLCertificateFile /etc/ssl/private/misp.local.crt
+        SSLCertificateKeyFile /etc/ssl/private/misp.local.key
+#        SSLCertificateChainFile /etc/ssl/private/misp-chain.crt
+
+        LogLevel warn
+        ErrorLog /var/log/apache2/misp.local_error.log
+        CustomLog /var/log/apache2/misp.local_access.log combined
+        ServerSignature Off
+</VirtualHost>
+============================================= End sample working SSL config for MISP
